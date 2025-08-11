@@ -1,0 +1,18 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	autocrlf = input
+[remote "origin"]
+	url = git@github.com:BackTesting321/FluxLab.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main
+[branch "dev"]
+	remote = origin
+	merge = refs/heads/dev
+[extensions]
+	worktreeConfig = true

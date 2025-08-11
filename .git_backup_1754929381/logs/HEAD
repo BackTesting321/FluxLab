@@ -1,0 +1,6 @@
+0000000000000000000000000000000000000000 4aee67e1d082cf638b3cd3f27cf1c829103acbf3 BackTesting321 <kostyukov.pv@yandex.ru> 1754924069 +0300	commit (initial): bootstrap: FluxLab initial structure
+4aee67e1d082cf638b3cd3f27cf1c829103acbf3 0000000000000000000000000000000000000000 BackTesting321 <kostyukov.pv@yandex.ru> 1754924169 +0300	Branch: renamed refs/heads/master to refs/heads/main
+0000000000000000000000000000000000000000 4aee67e1d082cf638b3cd3f27cf1c829103acbf3 BackTesting321 <kostyukov.pv@yandex.ru> 1754924169 +0300	Branch: renamed refs/heads/master to refs/heads/main
+4aee67e1d082cf638b3cd3f27cf1c829103acbf3 4aee67e1d082cf638b3cd3f27cf1c829103acbf3 BackTesting321 <kostyukov.pv@yandex.ru> 1754924799 +0300	checkout: moving from main to dev
+4aee67e1d082cf638b3cd3f27cf1c829103acbf3 047b0cae203ebe67c853acd1c57b6a654a87ec4c BackTesting321 <kostyukov.pv@yandex.ru> 1754927734 +0300	commit: bootstrap: working Django backend skeleton (apps, urls, views, settings)
+047b0cae203ebe67c853acd1c57b6a654a87ec4c cf736031899da5f41a269d00d17806abc00d1f19 BackTesting321 <kostyukov.pv@yandex.ru> 1754927798 +0300	commit: fix: remove accidental nested git repo from server/fluxlab
