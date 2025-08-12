@@ -1,61 +1,38 @@
-import glob
-import hashlib
+from pathlib import Path
 import os
 
-from PIL import Image
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+BASE_DIR = Path(__file__).resolve().parent.parent
+SECRET_KEY = 'dev-secret-key-change-me'
+DEBUG = True
+ALLOWED_HOSTS = ['*']
 
-from .models import Dataset, DatasetItem
-from .serializers import DatasetListSerializer, DatasetScanSerializer
+INSTALLED_APPS = [
+'django.contrib.admin','django.contrib.auth','django.contrib.contenttypes',
+'django.contrib.sessions','django.contrib.messages','django.contrib.staticfiles',
+'rest_framework','corsheaders',
+'dataset_viewer',
+]
 
+MIDDLEWARE = [
+'django.middleware.security.SecurityMiddleware','django.contrib.sessions.middleware.SessionMiddleware',
+'corsheaders.middleware.CorsMiddleware','django.middleware.common.CommonMiddleware',
+'django.middleware.csrf.CsrfViewMiddleware','django.contrib.auth.middleware.AuthenticationMiddleware',
+'django.contrib.messages.middleware.MessageMiddleware','django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
 
-@api_view(["GET"])
-def datasets_list(_request):
-    datasets = Dataset.objects.all()
-    serializer = DatasetListSerializer(datasets, many=True)
-    return Response(serializer.data)
+ROOT_URLCONF = 'fluxlab.urls'
+TEMPLATES = [{
+'BACKEND':'django.template.backends.django.DjangoTemplates',
+'DIRS':[], 'APP_DIRS':True,
+'OPTIONS':{'context_processors':[
+'django.template.context_processors.debug','django.template.context_processors.request',
+'django.contrib.auth.context_processors.auth','django.contrib.messages.context_processors.messages',
+]},
+}]
+WSGI_APPLICATION = 'fluxlab.wsgi.application'
 
-
-@api_view(["POST"])
-def dataset_scan(request):
-    serializer = DatasetScanSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    name = serializer.validated_data["name"]
-    root_dir = serializer.validated_data["root_dir"]
-
-    dataset, _ = Dataset.objects.get_or_create(name=name, defaults={"root_dir": root_dir})
-    if dataset.root_dir != root_dir:
-        dataset.root_dir = root_dir
-        dataset.save(update_fields=["root_dir"])
-
-    images_dir = os.path.join(root_dir, "images")
-    patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp"]
-    created = 0
-    skipped = 0
-    for pattern in patterns:
-        for file_path in glob.glob(os.path.join(images_dir, "**", pattern), recursive=True):
-            rel_path = os.path.relpath(file_path, root_dir)
-            if DatasetItem.objects.filter(dataset=dataset, image_path=rel_path).exists():
-                skipped += 1
-                continue
-            try:
-                with Image.open(file_path) as img:
-                    width, height = img.size
-            except Exception:
-                skipped += 1
-                continue
-            try:
-                with open(file_path, "rb") as f:
-                    sha256 = hashlib.sha256(f.read()).hexdigest()
-            except Exception:
-                sha256 = ""
-            DatasetItem.objects.create(
-                dataset=dataset,
-                image_path=rel_path,
-                width=width,
-                height=height,
-                sha256=sha256,
-            )
-            created += 1
-    return Response({"created": created, "skipped": skipped})
+DATABASES = {'default':{'ENGINE':'django.db.backends.sqlite3','NAME': BASE_DIR / 'db.sqlite3'}}
+AUTH_PASSWORD_VALIDATORS = []
+LANGUAGE_CODE = 'ru-ru'
+TIME_ZONE = 'Europe/Moscow'
+USE_I18N = True
