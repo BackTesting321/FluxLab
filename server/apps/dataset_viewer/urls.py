@@ -1,3 +1,8 @@
 from django.urls import path
+
 from . import views
-urlpatterns = [ path('', views.index) ]
+
+urlpatterns = [
+    path("", views.datasets_list),
+    path("scan", views.dataset_scan),
+]

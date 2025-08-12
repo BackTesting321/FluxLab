@@ -2,31 +2,25 @@ from django.db import models
 
 
 class Dataset(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
-    allow_nsfw = models.BooleanField(default=False)
+    root_dir = models.CharField(max_length=1024)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
 class DatasetItem(models.Model):
-    class Status(models.TextChoices):
-        OK = 'ok', 'OK'
-        NEEDS_FIX = 'needs_fix', 'Needs fix'
-        REJECTED = 'rejected', 'Rejected'
-
-    dataset = models.ForeignKey(Dataset, related_name='items', on_delete=models.CASCADE)
-    rel_path = models.CharField(max_length=1024)
-    size = models.IntegerField()
-    width = models.IntegerField()
-    height = models.IntegerField()
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OK)
-    tags = models.JSONField(default=list, blank=True)
-    meta = models.JSONField(default=dict, blank=True)
+    dataset = models.ForeignKey(Dataset, related_name="items", on_delete=models.CASCADE)
+    image_path = models.CharField(max_length=1024)
+    caption_path = models.CharField(max_length=1024, blank=True)
+    mask_path = models.CharField(max_length=1024, blank=True)
+    width = models.IntegerField(null=True)
+    height = models.IntegerField(null=True)
+    sha256 = models.CharField(max_length=64, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.dataset_id}:{self.rel_path}"
-    
+    def __str__(self) -> str:
+        return f"{self.dataset_id}:{self.image_path}"
