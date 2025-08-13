@@ -95,4 +95,13 @@
   // Инициал
   if (!qs.get('page')) { qs.set('page', '1'); history.replaceState({}, '', `?${qs.toString()}`); }
   load();
+
+    // дать доступ uploader-скрипту обновить сетку
+  window.__reloadGrid = () => {
+    // сбросим на первую страницу — по желанию:
+    // const qs = new URLSearchParams(location.search);
+    // qs.set('page','1'); history.replaceState({}, '', `?${qs.toString()}`);
+    // затем просто перегрузим текущую страницу данных
+    (typeof load === 'function') && load();
+  };
 })();

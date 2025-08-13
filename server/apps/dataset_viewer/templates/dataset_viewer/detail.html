@@ -12,6 +12,21 @@
     <h1>Dataset #{{ dataset_id }}</h1>
     <div id="ds-meta" class="muted">Загрузка сведений…</div>
   </header>
+  <!-- вставить сразу после header -->
+  <section class="uploader">
+    <div class="u-head">
+      <strong>Загрузка изображений</strong>
+      <span class="muted">перетащите файлы сюда или выберите вручную</span>
+    </div>
+
+    <div class="u-drop" id="u-drop">
+      <input type="file" id="u-input" multiple accept=".jpg,.jpeg,.png,.webp" hidden>
+      <button type="button" id="u-choose">Выбрать файлы</button>
+      <div class="u-hint">Поддерживаются: JPG, PNG, WEBP</div>
+    </div>
+
+    <div class="u-queue" id="u-queue" aria-live="polite"></div>
+  </section>
 
   <section class="filters">
     <form id="filters-form">
@@ -61,5 +76,7 @@
     window.__FLUXLAB__ = { datasetId: {{ dataset_id }} };
   </script>
   <script src="{% static 'dataset_viewer/view.js' %}"></script>
+</script>
+  <script src="{% static 'dataset_viewer/upload.js' %}"></script>
 </body>
 </html>
