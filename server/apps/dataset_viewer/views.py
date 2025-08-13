@@ -7,6 +7,7 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from django.shortcuts import render
 
 from .models import Dataset, DatasetItem
 from .serializers import (
@@ -203,4 +204,8 @@ def dataset_scan(request):
         )
         if was_created:
             created += 1
-            
+
+
+def dataset_view_page(request, dataset_id: int):
+    """Render the dataset browser page."""
+    return render(request, "dataset_viewer/detail.html", {"dataset_id": dataset_id})

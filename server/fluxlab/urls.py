@@ -8,5 +8,6 @@ urlpatterns = [
 path('admin/', admin.site.urls),
 path('api/health', health),
 path('api/datasets/', include('dataset_viewer.urls')),
+path('datasets/', include('dataset_viewer.urls')),
 path('', include('webui.urls')),
 ]

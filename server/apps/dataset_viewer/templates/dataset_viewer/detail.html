@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <title>Dataset {{ dataset_id }} — FluxLab</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'dataset_viewer/view.css' %}">
+</head>
+<body>
+  <header class="flx-header">
+    <h1>Dataset #{{ dataset_id }}</h1>
+    <div id="ds-meta" class="muted">Загрузка сведений…</div>
+  </header>
+
+  <section class="filters">
+    <form id="filters-form">
+      <input type="text" name="q" placeholder="Поиск в пути (q)">
+      <input type="number" name="min_w" placeholder="min_w" min="1">
+      <input type="number" name="max_w" placeholder="max_w" min="1">
+      <input type="number" name="min_h" placeholder="min_h" min="1">
+      <input type="number" name="max_h" placeholder="max_h" min="1">
+      <select name="has_caption">
+        <option value="">caption: любой</option>
+        <option value="true">только с caption</option>
+        <option value="false">только без caption</option>
+      </select>
+      <select name="page_size">
+        <option>20</option><option selected>50</option><option>100</option><option>200</option>
+      </select>
+      <button type="submit">Применить</button>
+      <button type="button" id="reset-btn">Сброс</button>
+    </form>
+  </section>
+
+  <section class="grid" id="grid"></section>
+
+  <nav class="pager" id="pager">
+    <button id="prev-btn" disabled>&larr; Назад</button>
+    <span id="page-info"></span>
+    <button id="next-btn" disabled>Вперед &rarr;</button>
+  </nav>
+
+  <template id="card-tpl">
+    <div class="card">
+      <div class="thumb-wrap">
+        <img class="thumb" alt="">
+      </div>
+      <div class="meta">
+        <div class="path"></div>
+        <div class="size"></div>
+        <div class="actions">
+          <button class="copy-btn" type="button">Скопировать путь</button>
+          <a class="open-btn" target="_blank">Открыть</a>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    window.__FLUXLAB__ = { datasetId: {{ dataset_id }} };
+  </script>
+  <script src="{% static 'dataset_viewer/view.js' %}"></script>
+</body>
+</html>
