@@ -24,3 +24,14 @@ class DatasetItem(models.Model):
 
     def __str__(self) -> str:
         return f"{self.dataset_id}:{self.image_path}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("dataset", "image_path"), name="dataset_item_unique"
+            )
+        ]
+        indexes = [
+            models.Index(fields=("dataset",)),
+            models.Index(fields=("image_path",)),
+        ]

@@ -11,7 +11,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 INSTALLED_APPS = [
 'django.contrib.admin','django.contrib.auth','django.contrib.contenttypes',
 'django.contrib.sessions','django.contrib.messages','django.contrib.staticfiles',
-'rest_framework','corsheaders', 'dataset_viewer','webui', "apps.training", "apps.promptgen", "apps.enhance",
+'rest_framework','corsheaders', 'dataset_viewer','webui',
 ]
 
 MIDDLEWARE = [
@@ -37,3 +37,10 @@ AUTH_PASSWORD_VALIDATORS = []
 LANGUAGE_CODE = 'ru-ru'
 TIME_ZONE = 'Europe/Moscow'
 USE_I18N = True
+
+MEDIA_ROOT = BASE_DIR / "media"
+
+REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 50,
+}
