@@ -12,16 +12,30 @@ class DatasetListSerializer(serializers.ModelSerializer):
 
 class DatasetDetailSerializer(serializers.ModelSerializer):
     items_count = serializers.IntegerField(read_only=True)
-    total_pixels = serializers.IntegerField(read_only=True)
-    avg_w = serializers.FloatField(read_only=True)
-    avg_h = serializers.FloatField(read_only=True)
 
     class Meta:
         model = Dataset
-        fields = ["id", "name", "root_dir", "items_count", "total_pixels", "avg_w", "avg_h"]
+        fields = (
+            "id",
+            "name",
+            "root_dir",
+            "created_at",
+            "updated_at",
+            "items_count",
+        )
 
 
 class DatasetItemSerializer(serializers.ModelSerializer):
+    caption = serializers.CharField(source="caption_path", allow_blank=True)
+
     class Meta:
         model = DatasetItem
-        fields = ["id", "image_path", "width", "height", "sha256"]
+        fields = (
+            "id",
+            "image_path",
+            "width",
+            "height",
+            "sha256",
+            "caption",
+            "created_at",
+        )
