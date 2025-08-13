@@ -7,6 +7,7 @@ urlpatterns = [
     path("scan", views.dataset_scan),
     path("<int:dataset_id>/", views.dataset_detail),
     path("<int:dataset_id>/items", views.dataset_items),
+    path("<int:dataset_id>/items/<int:item_id>/", views.dataset_item_detail, name="dataset_item_detail"),
     path("<int:dataset_id>/upload", views.dataset_upload),
     path("item/<int:item_id>/image", views.item_image),
 

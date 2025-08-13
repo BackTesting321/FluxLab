@@ -39,3 +39,26 @@ class DatasetItemSerializer(serializers.ModelSerializer):
             "caption",
             "created_at",
         )
+
+class DatasetItemDetailSerializer(serializers.ModelSerializer):
+    """Serializer for a single dataset item."""
+
+    caption = serializers.CharField(source="caption_path", allow_blank=True)
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DatasetItem
+        fields = (
+            "id",
+            "image_url",
+            "image_path",
+            "width",
+            "height",
+            "sha256",
+            "caption",
+            "created_at",
+        )
+
+    def get_image_url(self, obj):  # pragma: no cover - trivial
+        """Return URL used to serve the item's image."""
+        return f"/api/datasets/item/{obj.id}/image"

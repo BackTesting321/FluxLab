@@ -14,6 +14,7 @@ from .serializers import (
     DatasetListSerializer,
     DatasetDetailSerializer,
     DatasetItemSerializer,
+    DatasetItemDetailSerializer,
 )
 from .utils import (
     iter_images,
@@ -89,6 +90,24 @@ def dataset_items(request, dataset_id: int):
     page = paginator.paginate_queryset(qs, request)
     data = DatasetItemSerializer(page, many=True).data
     return paginator.get_paginated_response(data)
+
+@api_view(["GET", "DELETE"])
+def dataset_item_detail(request, dataset_id: int, item_id: int):
+    """Retrieve or delete a single dataset item."""
+
+    item = (
+        DatasetItem.objects.filter(id=item_id, dataset_id=dataset_id)
+        .select_related("dataset")
+        .first()
+    )
+    if not item:
+        raise Http404("Item not found")
+
+    if request.method == "DELETE":
+        item.delete()
+        return Response(status=204)
+
+    return Response(DatasetItemDetailSerializer(item).data)
 
 
 @api_view(["GET"])

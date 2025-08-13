@@ -72,11 +72,36 @@
     </div>
   </template>
 
+  <div id="itemModal" class="flx-modal" hidden>
+    <div class="flx-modal__backdrop" data-close></div>
+    <div class="flx-modal__dialog" role="dialog" aria-modal="true" aria-label="Просмотр изображения">
+      <button class="flx-modal__close" data-close>&times;</button>
+
+      <div class="flx-modal__content">
+        <div class="flx-modal__image-wrap">
+          <img id="modalImage" alt="">
+        </div>
+
+        <div class="flx-modal__meta">
+          <div><strong>ID:</strong> <span id="metaId"></span></div>
+          <div><strong>Размер:</strong> <span id="metaSize"></span></div>
+          <div><strong>Путь:</strong> <span id="metaPath"></span></div>
+          <div><strong>SHA256:</strong> <span id="metaSha"></span></div>
+          <div class="flx-modal__actions">
+            <button id="deleteItemBtn" class="btn btn-danger">Удалить</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="flx-modal__nav flx-modal__nav--prev" id="navPrev" aria-label="Предыдущее">&#x2039;</button>
+      <button class="flx-modal__nav flx-modal__nav--next" id="navNext" aria-label="Следующее">&#x203A;</button>
+    </div>
+  </div>
+
   <script>
     window.__FLUXLAB__ = { datasetId: {{ dataset_id }} };
   </script>
   <script src="{% static 'dataset_viewer/view.js' %}"></script>
-</script>
   <script src="{% static 'dataset_viewer/upload.js' %}"></script>
 </body>
 </html>
