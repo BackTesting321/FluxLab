@@ -3,7 +3,9 @@ from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path
 from typing import Iterator, Optional
+import pathlib
 
+from django.conf import settings
 from PIL import Image
 
 
@@ -54,3 +56,15 @@ def make_thumbnail(src_path: Path, dst_path: Path, size: int = 256) -> None:
         img = img.resize((new_w, new_h), Image.LANCZOS)
         dst_path.parent.mkdir(parents=True, exist_ok=True)
         img.save(dst_path, "JPEG", quality=85)
+
+
+def resolve_dataset_image_abs_path(dataset, rel_path: str) -> pathlib.Path:
+    root = pathlib.Path(dataset.root_dir).resolve()
+    candidate = (root / rel_path).resolve()
+    if root not in candidate.parents and root != candidate.parent:
+        raise ValueError("Path traversal detected")
+    return candidate
+
+
+def thumbnail_path_for(dataset_id: int, rel_path: str) -> pathlib.Path:
+    return (settings.THUMBNAILS_ROOT / str(dataset_id) / rel_path).with_suffix(".jpg")

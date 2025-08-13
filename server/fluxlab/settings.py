@@ -44,3 +44,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
 }
+
+# Where thumbnails are stored
+THUMBNAILS_ROOT = BASE_DIR / "storage" / "thumbnails"
+THUMBNAIL_SIZE = (512, 512)
+FILE_SERVE_PREFIX = "/api/datasets"

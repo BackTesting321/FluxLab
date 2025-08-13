@@ -45,7 +45,7 @@
     try {
       const r = await fetch(`/api/datasets/${dsId}/items/${item.id}/`);
       const data = await r.json();
-      modalImg.src = data.image_url || `/api/datasets/item/${item.id}/image`;
+      modalImg.src = data.image_url || item.image_url;
       metaId.textContent = data.id;
       metaSize.textContent = `${data.width} × ${data.height}`;
       metaPath.textContent = data.image_path;
@@ -103,12 +103,13 @@
       const openBtn = node.querySelector('.open-btn');
       const card = node.querySelector('.card');
 
-      img.src = `/api/datasets/item/${item.id}/image`;
+      img.src = item.thumb_url || item.image_url;
       img.alt = item.image_path;
+      img.onerror = () => { img.onerror = null; img.src = item.image_url; };
       path.textContent = item.image_path;
       size.textContent = `${item.width} × ${item.height}`;
       copyBtn.addEventListener('click', (e) => { e.stopPropagation(); navigator.clipboard.writeText(item.image_path); });
-      openBtn.href = img.src;
+      openBtn.href = item.image_url;
       openBtn.addEventListener('click', e => e.stopPropagation());
       card.dataset.id = item.id;
       card.querySelector('.thumb-wrap').addEventListener('click', () => openModalById(item.id));

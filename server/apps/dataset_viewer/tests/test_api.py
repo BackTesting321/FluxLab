@@ -39,6 +39,13 @@ class DatasetAPITests(TestCase):
             sha256="abcd",
         )
 
+        # List should include URLs
+        resp_list = self.client.get(f"/api/datasets/{ds.id}/items")
+        self.assertEqual(resp_list.status_code, 200)
+        lst = resp_list.json()["results"][0]
+        self.assertIn("image_url", lst)
+        self.assertIn("thumb_url", lst)
+
         # Detail
         resp = self.client.get(f"/api/datasets/{ds.id}/items/{item.id}/")
         self.assertEqual(resp.status_code, 200)
@@ -46,6 +53,7 @@ class DatasetAPITests(TestCase):
         self.assertEqual(data["id"], item.id)
         self.assertEqual(data["image_path"], "images/1.jpg")
         self.assertIn("image_url", data)
+        self.assertIn("thumb_url", data)
 
         # Wrong dataset -> 404
         resp404 = self.client.get(f"/api/datasets/{ds.id + 1}/items/{item.id}/")

@@ -3,6 +3,7 @@ import os
 
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404
+from django.conf import settings
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.pagination import PageNumberPagination
@@ -13,13 +14,15 @@ from .models import Dataset, DatasetItem
 from .serializers import (
     DatasetListSerializer,
     DatasetDetailSerializer,
-    DatasetItemSerializer,
+    DatasetItemListSerializer,
     DatasetItemDetailSerializer,
 )
 from .utils import (
     iter_images,
     open_image_size,
     sha256_file,
+    resolve_dataset_image_abs_path,
+    thumbnail_path_for,
 )
 
 
@@ -45,9 +48,6 @@ def dataset_detail(_request, dataset_id: int):
 class ItemsPagination(PageNumberPagination):
     page_size = 50
     max_page_size = 500
-    page_query_param = "page"
-    page_size_query_param = "page_size"
-
 
 @api_view(["GET"])
 def dataset_items(request, dataset_id: int):
@@ -88,7 +88,7 @@ def dataset_items(request, dataset_id: int):
     qs = qs.order_by("id")
     paginator = ItemsPagination()
     page = paginator.paginate_queryset(qs, request)
-    data = DatasetItemSerializer(page, many=True).data
+    data = DatasetItemListSerializer(page, many=True).data
     return paginator.get_paginated_response(data)
 
 @api_view(["GET", "DELETE"])
@@ -123,6 +123,76 @@ def item_image(_request, item_id: int):
         raise Http404("File not found")
     return FileResponse(open(abs_path, "rb"))
 
+@api_view(["GET"])
+def dataset_file_serve(request, dataset_id: int):
+    dataset = Dataset.objects.filter(id=dataset_id).first()
+    if not dataset:
+        raise Http404("Dataset not found")
+
+    rel_path = request.GET.get("path")
+    if not rel_path:
+        return Response({"detail": "path is required"}, status=400)
+
+    try:
+        abs_path = resolve_dataset_image_abs_path(dataset, rel_path)
+    except ValueError:
+        return Response({"detail": "file not found"}, status=404)
+
+    if not abs_path.is_file():
+        return Response({"detail": "file not found"}, status=404)
+
+    ext = abs_path.suffix.lower().lstrip(".")
+    mimes = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
+    if ext not in mimes:
+        return Response({"detail": "unsupported media type"}, status=415)
+
+    resp = FileResponse(open(abs_path, "rb"), content_type=mimes[ext])
+    resp["Cache-Control"] = "public, max-age=86400"
+    etag = sha256_file(abs_path)
+    if etag:
+        resp["ETag"] = etag
+    return resp
+
+
+@api_view(["GET"])
+def dataset_thumb_serve(request, dataset_id: int):
+    dataset = Dataset.objects.filter(id=dataset_id).first()
+    if not dataset:
+        raise Http404("Dataset not found")
+
+    rel_path = request.GET.get("path")
+    if not rel_path:
+        return Response({"detail": "path is required"}, status=400)
+
+    try:
+        src_path = resolve_dataset_image_abs_path(dataset, rel_path)
+    except ValueError:
+        return Response({"detail": "file not found"}, status=404)
+
+    if not src_path.is_file():
+        return Response({"detail": "file not found"}, status=404)
+
+    ext = src_path.suffix.lower().lstrip(".")
+    if ext not in {"jpg", "jpeg", "png", "webp"}:
+        return Response({"detail": "unsupported media type"}, status=415)
+
+    thumb_path = thumbnail_path_for(dataset_id, rel_path)
+    thumb_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not thumb_path.exists():
+        from PIL import Image
+
+        with Image.open(src_path) as img:
+            img = img.convert("RGB")
+            img.thumbnail(settings.THUMBNAIL_SIZE, Image.LANCZOS)
+            img.save(thumb_path, "JPEG", quality=85)
+
+    resp = FileResponse(open(thumb_path, "rb"), content_type="image/jpeg")
+    resp["Cache-Control"] = "public, max-age=86400"
+    etag = sha256_file(thumb_path)
+    if etag:
+        resp["ETag"] = etag
+    return resp
 
 @api_view(["POST"])
 @parser_classes([MultiPartParser])

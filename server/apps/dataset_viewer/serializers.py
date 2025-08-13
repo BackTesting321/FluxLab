@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.conf import settings
 from .models import Dataset, DatasetItem
 
 
@@ -25,14 +26,18 @@ class DatasetDetailSerializer(serializers.ModelSerializer):
         )
 
 
-class DatasetItemSerializer(serializers.ModelSerializer):
+class DatasetItemListSerializer(serializers.ModelSerializer):
     caption = serializers.CharField(source="caption_path", allow_blank=True)
+    image_url = serializers.SerializerMethodField()
+    thumb_url = serializers.SerializerMethodField()
 
     class Meta:
         model = DatasetItem
         fields = (
             "id",
             "image_path",
+            "image_url",
+            "thumb_url",
             "width",
             "height",
             "sha256",
@@ -40,17 +45,27 @@ class DatasetItemSerializer(serializers.ModelSerializer):
             "created_at",
         )
 
+    def get_image_url(self, obj):  # pragma: no cover - trivial
+        prefix = settings.FILE_SERVE_PREFIX.rstrip('/')
+        return f"{prefix}/{obj.dataset_id}/files?path={obj.image_path}"
+
+    def get_thumb_url(self, obj):  # pragma: no cover - trivial
+        prefix = settings.FILE_SERVE_PREFIX.rstrip('/')
+        return f"{prefix}/{obj.dataset_id}/thumb?path={obj.image_path}"
+
 class DatasetItemDetailSerializer(serializers.ModelSerializer):
     """Serializer for a single dataset item."""
 
     caption = serializers.CharField(source="caption_path", allow_blank=True)
     image_url = serializers.SerializerMethodField()
+    thumb_url = serializers.SerializerMethodField()
 
     class Meta:
         model = DatasetItem
         fields = (
             "id",
             "image_url",
+            "thumb_url",
             "image_path",
             "width",
             "height",
@@ -60,5 +75,9 @@ class DatasetItemDetailSerializer(serializers.ModelSerializer):
         )
 
     def get_image_url(self, obj):  # pragma: no cover - trivial
-        """Return URL used to serve the item's image."""
-        return f"/api/datasets/item/{obj.id}/image"
+        prefix = settings.FILE_SERVE_PREFIX.rstrip('/')
+        return f"{prefix}/{obj.dataset_id}/files?path={obj.image_path}"
+
+    def get_thumb_url(self, obj):  # pragma: no cover - trivial
+        prefix = settings.FILE_SERVE_PREFIX.rstrip('/')
+        return f"{prefix}/{obj.dataset_id}/thumb?path={obj.image_path}"
