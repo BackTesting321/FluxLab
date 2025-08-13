@@ -11,7 +11,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 INSTALLED_APPS = [
 'django.contrib.admin','django.contrib.auth','django.contrib.contenttypes',
 'django.contrib.sessions','django.contrib.messages','django.contrib.staticfiles',
-'rest_framework','corsheaders', 'dataset_viewer', "apps.training", "apps.promptgen", "apps.enhance",
+'rest_framework','corsheaders', 'dataset_viewer','webui', "apps.training", "apps.promptgen", "apps.enhance",
 ]
 
 MIDDLEWARE = [
@@ -37,12 +37,3 @@ AUTH_PASSWORD_VALIDATORS = []
 LANGUAGE_CODE = 'ru-ru'
 TIME_ZONE = 'Europe/Moscow'
 USE_I18N = True
-
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"  # сюда сложится collectstatic (для прод)
-STATICFILES_DIRS = [
-    BASE_DIR / "static",  # сюда можно положить свои статические файлы в деве
-]
-
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR.parent / "storage"  # E:\FluxLab\storage

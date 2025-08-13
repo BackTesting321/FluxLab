@@ -1,0 +1,31 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Datasets</title>
+    <link rel="stylesheet" href="{% static 'webui/app.css' %}" />
+</head>
+<body>
+    <header class="topbar">
+        <select id="dataset-select"></select>
+        <span id="items-count"></span>
+        <input type="text" id="root-dir" placeholder="root_dir" />
+        <button id="rescan-btn">Пересканировать</button>
+    </header>
+    <main>
+        <div id="grid" class="grid"></div>
+        <button id="load-more" class="load-more">Загрузить ещё</button>
+        <div id="sentinel"></div>
+    </main>
+    <div id="toast" class="toast"></div>
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <span id="modal-close" class="close">&times;</span>
+            <img id="modal-image" src="" alt="" />
+            <a id="modal-download" href="" download>Скачать</a>
+        </div>
+    </div>
+    <script src="{% static 'webui/app.js' %}"></script>
+</body>
+</html>
