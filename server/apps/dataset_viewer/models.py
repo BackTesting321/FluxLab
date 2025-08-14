@@ -20,7 +20,8 @@ class DatasetItem(models.Model):
     width = models.IntegerField(null=True)
     height = models.IntegerField(null=True)
     sha256 = models.CharField(max_length=64, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    has_caption = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self) -> str:
         return f"{self.dataset_id}:{self.image_path}"
@@ -32,6 +33,16 @@ class DatasetItem(models.Model):
             )
         ]
         indexes = [
-            models.Index(fields=("dataset",)),
-            models.Index(fields=("image_path",)),
+            models.Index(
+                fields=["dataset", "image_path"], name="ds_item_path_idx"
+            ),
+            models.Index(
+                fields=["dataset", "width", "height"], name="ds_item_wh_idx"
+            ),
+            models.Index(
+                fields=["dataset", "has_caption"], name="ds_item_caption_idx"
+            ),
+            models.Index(
+                fields=["dataset", "created_at"], name="ds_item_created_idx"
+            ),
         ]

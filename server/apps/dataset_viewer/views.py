@@ -2,11 +2,10 @@ import hashlib
 import os
 
 from django.db.models import Count, Q
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from django.conf import settings
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from django.shortcuts import render
 
@@ -45,51 +44,104 @@ def dataset_detail(_request, dataset_id: int):
 
 # === Items ===
 
-class ItemsPagination(PageNumberPagination):
-    page_size = 50
-    max_page_size = 500
+ALLOWED_SORT = {"created_at", "width", "height", "image_path"}
+
 
 @api_view(["GET"])
-def dataset_items(request, dataset_id: int):
-    if not Dataset.objects.filter(id=dataset_id).exists():
-        raise Http404("Dataset not found")
-    qs = DatasetItem.objects.filter(dataset_id=dataset_id)
+def dataset_items_list(request, dataset_id: int):
+    try:
+        dataset = Dataset.objects.get(id=dataset_id)
+    except Dataset.DoesNotExist:
+        return JsonResponse({"detail": "dataset not found"}, status=404)
 
+    qs = DatasetItem.objects.filter(dataset=dataset)
+
+    # filters
     q = request.GET.get("q")
     if q:
         qs = qs.filter(image_path__icontains=q)
 
-    def to_int(v):
+    def to_int(name):
+        v = request.GET.get(name)
+        if v is None:
+            return None
         try:
             return int(v)
         except Exception:  # noqa: BLE001
-            return None
+            raise ValueError(f"{name} must be int")
 
-    mw = to_int(request.GET.get("min_w"))
-    xw = to_int(request.GET.get("max_w"))
-    mh = to_int(request.GET.get("min_h"))
-    xh = to_int(request.GET.get("max_h"))
-    if mw is not None:
-        qs = qs.filter(width__gte=mw)
-    if xw is not None:
-        qs = qs.filter(width__lte=xw)
-    if mh is not None:
-        qs = qs.filter(height__gte=mh)
-    if xh is not None:
-        qs = qs.filter(height__lte=xh)
+    try:
+        min_w, max_w = to_int("min_w"), to_int("max_w")
+        min_h, max_h = to_int("min_h"), to_int("max_h")
+    except ValueError as e:  # pragma: no cover - trivial
+        return JsonResponse({"detail": str(e)}, status=400)
+
+    if min_w is not None:
+        qs = qs.filter(width__gte=min_w)
+    if max_w is not None:
+        qs = qs.filter(width__lte=max_w)
+    if min_h is not None:
+        qs = qs.filter(height__gte=min_h)
+    if max_h is not None:
+        qs = qs.filter(height__lte=max_h)
 
     has_caption = request.GET.get("has_caption")
-    if has_caption in ("true", "false"):
-        if has_caption == "true":
-            qs = qs.filter(~Q(caption_path=""), ~Q(caption_path__isnull=True))
-        else:
-            qs = qs.filter(Q(caption_path="") | Q(caption_path__isnull=True))
+    if has_caption:
+        if has_caption.lower() not in ("true", "false"):
+            return JsonResponse(
+                {"detail": "has_caption must be true|false"}, status=400
+            )
+        qs = qs.filter(has_caption=(has_caption.lower() == "true"))
 
-    qs = qs.order_by("id")
-    paginator = ItemsPagination()
-    page = paginator.paginate_queryset(qs, request)
-    data = DatasetItemListSerializer(page, many=True).data
-    return paginator.get_paginated_response(data)
+    exts = request.GET.get("ext")
+    if exts:
+        exts_set = {
+            ("." + e.strip().lstrip(".")).lower()
+            for e in exts.split(",")
+            if e.strip()
+        }
+        if exts_set:
+            q_or = Q()
+            for ext in exts_set:
+                q_or |= Q(image_path__iendswith=ext)
+            qs = qs.filter(q_or)
+
+    order_by = request.GET.get("order_by", "image_path")
+    order = request.GET.get("order", "asc")
+    if order_by not in ALLOWED_SORT:
+        return JsonResponse(
+            {"detail": f"order_by must be one of {sorted(ALLOWED_SORT)}"},
+            status=400,
+        )
+    prefix = "" if order == "asc" else "-"
+    qs = qs.order_by(prefix + order_by)
+
+    def to_pg(name, default):
+        v = request.GET.get(name, default)
+        try:
+            return int(v)
+        except Exception:  # noqa: BLE001
+            raise ValueError(f"{name} must be int")
+
+    try:
+        page = max(1, to_pg("page", 1))
+        page_size = to_pg("page_size", 50)
+        if page_size < 1 or page_size > 200:
+            return JsonResponse(
+                {"detail": "page_size must be in [1..200]"}, status=400
+            )
+    except ValueError as e:  # pragma: no cover - trivial
+        return JsonResponse({"detail": str(e)}, status=400)
+
+    total = qs.count()
+    start = (page - 1) * page_size
+    items = list(qs[start : start + page_size])
+
+    data = DatasetItemListSerializer(items, many=True).data
+    return JsonResponse(
+        {"count": total, "page": page, "page_size": page_size, "results": data},
+        status=200,
+    )
 
 @api_view(["GET", "DELETE"])
 def dataset_item_detail(request, dataset_id: int, item_id: int):
@@ -108,7 +160,6 @@ def dataset_item_detail(request, dataset_id: int, item_id: int):
         return Response(status=204)
 
     return Response(DatasetItemDetailSerializer(item).data)
-
 
 @api_view(["GET"])
 def item_image(_request, item_id: int):
@@ -259,8 +310,6 @@ class DatasetScanSerializer(serializers.Serializer):
 
 @api_view(["POST"])
 def dataset_scan(request):
-    ser = DatasetScanSerializer(data=request.data)
-    ser.is_valid(raise_exception=True)
     name = ser.validated_data["name"]
     root_dir = ser.validated_data["root_dir"]
 
@@ -286,14 +335,28 @@ def dataset_scan(request):
             continue
         width, height = size
         sha = sha256_file(file_path)
+        base, _ = os.path.splitext(file_path)
+        has_caption = os.path.exists(base + ".txt") or os.path.exists(base + ".json")
         obj, was_created = DatasetItem.objects.get_or_create(
             dataset=dataset,
             image_path=rel_path,
-            defaults={"width": width, "height": height, "sha256": sha},
+            defaults={
+                "width": width,
+                "height": height,
+                "sha256": sha,
+                "has_caption": has_caption,
+            },
         )
         if was_created:
             created += 1
+        elif obj.has_caption != has_caption:
+            obj.has_caption = has_caption
+            obj.save(update_fields=["has_caption"])
 
+
+def dataset_view_page(request, dataset_id: int):
+    """Render the dataset browser page."""
+    return render(request, "dataset_viewer/detail.html", {"dataset_id": dataset_id})
 
 def dataset_view_page(request, dataset_id: int):
     """Render the dataset browser page."""

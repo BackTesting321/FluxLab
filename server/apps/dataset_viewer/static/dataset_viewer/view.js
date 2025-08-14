@@ -91,7 +91,7 @@
     const p = paramsFromForm();
     const url = `/api/datasets/${dsId}/items?` + p.toString();
     const r = await fetch(url);
-    const data = await r.json(); // DRF pagination format
+    const data = await r.json();
 
     items = data.results || [];
     items.forEach(item => {
@@ -118,20 +118,23 @@
     });
 
     // пагинация
-    pageInfo.textContent = `Страница ${data.current || qs.get('page') || 1} из ~? (count: ${data.count})`;
-    prevBtn.disabled = !data.previous;
-    nextBtn.disabled = !data.next;
+       const page = data.page || parseInt(qs.get('page') || '1');
+    const pageSize = data.page_size || parseInt(qs.get('page_size') || '50');
+    const total = data.count || 0;
+    pageInfo.textContent = `Страница ${page} · размер ${pageSize} · всего ${total}`;
+    const hasPrev = page > 1;
+    const hasNext = page * pageSize < total;
+    prevBtn.disabled = !hasPrev;
+    nextBtn.disabled = !hasNext;
 
     prevBtn.onclick = () => {
-      const urlPrev = new URL(data.previous, location.origin);
-      const page = urlPrev.searchParams.get('page') || '1';
-      qs.set('page', page); history.replaceState({}, '', `?${qs.toString()}`);
+      qs.set('page', String(page - 1));
+      history.replaceState({}, '', `?${qs.toString()}`);
       load();
     };
     nextBtn.onclick = () => {
-      const urlNext = new URL(data.next, location.origin);
-      const page = urlNext.searchParams.get('page') || '1';
-      qs.set('page', page); history.replaceState({}, '', `?${qs.toString()}`);
+      qs.set('page', String(page + 1));
+      history.replaceState({}, '', `?${qs.toString()}`);
       load();
     };
   }

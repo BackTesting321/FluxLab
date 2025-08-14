@@ -26,7 +26,7 @@ class DatasetAPITests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(
             resp.json(),
-            {"count": 0, "next": None, "previous": None, "results": []},
+            {"count": 0, "page": 1, "page_size": 50, "results": []},
         )
 
     def test_item_detail_and_delete(self):
