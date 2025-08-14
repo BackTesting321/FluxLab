@@ -67,8 +67,6 @@ class DatasetAPITests(TestCase):
         self.assertIn(resp_del.status_code, (200, 204))
         self.assertEqual(DatasetItem.objects.count(), 0)
 
-0)
-
     def _create_dataset_with_items(self):
         root = tempfile.mkdtemp()
         self.addCleanup(lambda: shutil.rmtree(root, ignore_errors=True))

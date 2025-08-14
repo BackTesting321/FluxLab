@@ -9,6 +9,7 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from django.shortcuts import render
+from pathlib import Path
 
 from .models import Dataset, DatasetItem
 from .serializers import (
@@ -23,6 +24,11 @@ from .utils import (
     sha256_file,
     resolve_dataset_image_abs_path,
     thumbnail_path_for,
+    get_dataset_root,
+    get_masks_dir,
+    default_mask_relpath,
+    validate_mask_image,
+    write_mask_file,
 )
 
 
@@ -174,6 +180,103 @@ def item_image(_request, item_id: int):
     if not os.path.isfile(abs_path):
         raise Http404("File not found")
     return FileResponse(open(abs_path, "rb"))
+@api_view(["GET", "POST", "DELETE"])
+@parser_classes([MultiPartParser])
+def dataset_item_mask(request, item_id: int):
+    item = DatasetItem.objects.select_related("dataset").filter(id=item_id).first()
+    if not item:
+        raise Http404("Item not found")
+    dataset = item.dataset
+    root = get_dataset_root(dataset)
+
+    if request.method == "GET":
+        if not item.mask_path:
+            raise Http404("Mask not found")
+        abs_mask = (root / item.mask_path).resolve()
+        if not abs_mask.is_file():
+            raise Http404("Mask not found")
+        return FileResponse(open(abs_mask, "rb"), content_type="image/png")
+
+    if request.method == "DELETE":
+        delete_flag = request.GET.get("delete_file", "1")
+        if item.mask_path:
+            abs_mask = (root / item.mask_path).resolve()
+            if delete_flag == "1":
+                try:
+                    abs_mask.unlink()
+                except OSError:
+                    pass
+            item.mask_path = None
+            item.save(update_fields=["mask_path"])
+        return Response(DatasetItemDetailSerializer(item).data)
+
+    # POST
+    if "file" in request.FILES:
+        file_obj = request.FILES["file"]
+        try:
+            validate_mask_image(file_obj, item.width or 0, item.height or 0)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=400)
+        rel_path = default_mask_relpath(item)
+        abs_path = get_dataset_root(dataset) / rel_path
+        get_masks_dir(dataset)
+        write_mask_file(abs_path, file_obj)
+    else:
+        existing_path = request.data.get("existing_path")
+        if not existing_path:
+            return Response({"detail": "file or existing_path required"}, status=400)
+        try:
+            src_path = resolve_dataset_image_abs_path(dataset, existing_path)
+        except ValueError:
+            return Response({"detail": "file not found"}, status=404)
+        if not src_path.is_file():
+            return Response({"detail": "file not found"}, status=404)
+        try:
+            validate_mask_image(src_path, item.width or 0, item.height or 0)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=400)
+        rel_path = default_mask_relpath(item)
+        abs_path = get_dataset_root(dataset) / rel_path
+        get_masks_dir(dataset)
+        with open(src_path, "rb") as fsrc:
+            write_mask_file(abs_path, fsrc)
+
+    item.mask_path = rel_path
+    item.save(update_fields=["mask_path"])
+    return Response(DatasetItemDetailSerializer(item).data)
+
+
+@api_view(["GET"])
+def dataset_item_mask_preview(request, item_id: int):
+    item = DatasetItem.objects.select_related("dataset").filter(id=item_id).first()
+    if not item or not item.mask_path:
+        raise Http404("Mask not found")
+
+    try:
+        size = int(request.GET.get("size", "128"))
+    except ValueError:
+        return Response({"detail": "size must be int"}, status=400)
+    size = max(1, size)
+
+    root = get_dataset_root(item.dataset)
+    mask_abs = (root / item.mask_path).resolve()
+    if not mask_abs.is_file():
+        raise Http404("Mask not found")
+
+    cache_path = root / ".cache" / "masks" / str(size) / item.mask_path
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    if not cache_path.exists():
+        from PIL import Image
+
+        with Image.open(mask_abs) as img:
+            mask = img.convert("L")
+            preview = Image.new("RGBA", mask.size, (0, 0, 0, 0))
+            white = Image.new("RGBA", mask.size, (255, 255, 255, 255))
+            preview.paste(white, mask=mask)
+            preview.thumbnail((size, size), Image.NEAREST)
+            preview.save(cache_path, "PNG")
+
+    return FileResponse(open(cache_path, "rb"), content_type="image/png")
 
 @api_view(["GET"])
 def dataset_file_serve(request, dataset_id: int):
@@ -412,7 +515,7 @@ def dataset_import(request, dataset_id: int):
             )
 
         item.has_caption = bool(meta.caption)
-        item.mask_path = meta.mask or ""
+        item.mask_path = meta.mask or None
         item.save(update_fields=["caption_path", "mask_path", "has_caption"])
 
     return Response({"updated": len(items)})
@@ -458,24 +561,39 @@ def dataset_scan(request):
         sha = sha256_file(file_path)
         base, _ = os.path.splitext(file_path)
         has_caption = os.path.exists(base + ".txt") or os.path.exists(base + ".json")
+        mask_rel = default_mask_relpath(
+            type("X", (), {"image_path": rel_path})()
+        )
+        mask_abs = Path(root_dir) / mask_rel
+        has_mask = mask_abs.is_file()
+        defaults = {
+            "width": width,
+            "height": height,
+            "sha256": sha,
+            "has_caption": has_caption,
+            "mask_path": mask_rel if has_mask else None,
+        }
         obj, was_created = DatasetItem.objects.get_or_create(
             dataset=dataset,
             image_path=rel_path,
-            defaults={
-                "width": width,
-                "height": height,
-                "sha256": sha,
-                "has_caption": has_caption,
-            },
+            defaults=defaults,
         )
         if was_created:
             created += 1
-        elif obj.has_caption != has_caption:
-            obj.has_caption = has_caption
-            obj.save(update_fields=["has_caption"])
+        else:
+            updated_fields: list[str] = []
+            if obj.has_caption != has_caption:
+                obj.has_caption = has_caption
+                updated_fields.append("has_caption")
+            expected_mask = mask_rel if has_mask else None
+            if obj.mask_path != expected_mask:
+                obj.mask_path = expected_mask
+                updated_fields.append("mask_path")
+            if updated_fields:
+                obj.save(update_fields=updated_fields)
 
     return Response({"created": created, "skipped": skipped})
 
-def dataset_view_page(request, dataset_id: int):
-    """Render the dataset browser page."""
-    return render(request, "dataset_viewer/detail.html", {"dataset_id": dataset_id})
+    def dataset_view_page(request, dataset_id: int):
+        """Render the dataset browser page."""
+        return render(request, "dataset_viewer/detail.html", {"dataset_id": dataset_id})

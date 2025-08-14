@@ -16,7 +16,12 @@ class DatasetItem(models.Model):
     dataset = models.ForeignKey(Dataset, related_name="items", on_delete=models.CASCADE)
     image_path = models.CharField(max_length=1024)
     caption_path = models.CharField(max_length=1024, blank=True)
-    mask_path = models.CharField(max_length=1024, blank=True)
+    mask_path = models.CharField(
+        max_length=512,
+        null=True,
+        blank=True,
+        help_text="relative to dataset.root_dir",
+    )
     width = models.IntegerField(null=True)
     height = models.IntegerField(null=True)
     sha256 = models.CharField(max_length=64, blank=True)

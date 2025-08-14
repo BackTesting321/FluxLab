@@ -68,3 +68,45 @@ def resolve_dataset_image_abs_path(dataset, rel_path: str) -> pathlib.Path:
 
 def thumbnail_path_for(dataset_id: int, rel_path: str) -> pathlib.Path:
     return (settings.THUMBNAILS_ROOT / str(dataset_id) / rel_path).with_suffix(".jpg")
+
+
+def get_dataset_root(dataset) -> Path:
+    return Path(dataset.root_dir)
+
+
+def get_masks_dir(dataset) -> Path:
+    path = get_dataset_root(dataset) / "masks"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def default_mask_relpath(item) -> str:
+    stem = Path(item.image_path).stem
+    return str(Path("masks") / f"{stem}.png")
+
+
+def validate_mask_image(mask_file, target_w: int, target_h: int) -> None:
+    try:
+        with Image.open(mask_file) as img:
+            w, h = img.size
+    except Exception as exc:  # pragma: no cover - simple validation
+        raise ValueError("invalid image") from exc
+    if w != target_w or h != target_h:
+        raise ValueError("mask size mismatch")
+    if hasattr(mask_file, "seek"):
+        mask_file.seek(0)
+
+
+def write_mask_file(dst_path: Path, fileobj) -> None:
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(dst_path, "wb") as out:
+        if hasattr(fileobj, "chunks"):
+            for chunk in fileobj.chunks():
+                out.write(chunk)
+        elif hasattr(fileobj, "read"):
+            for chunk in iter(lambda: fileobj.read(8192), b""):
+                out.write(chunk)
+        else:  # pragma: no cover - alt path
+            with open(fileobj, "rb") as src:
+                for chunk in iter(lambda: src.read(8192), b""):
+                    out.write(chunk)
