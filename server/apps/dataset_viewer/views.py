@@ -1,5 +1,6 @@
 import hashlib
 import os
+import json
 
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404, JsonResponse
@@ -297,6 +298,124 @@ def dataset_upload(request, dataset_id: int):
 
     return Response({"created": created, "skipped": skipped})
 
+# === Import / Export Metadata ===
+
+from pydantic import BaseModel, ValidationError
+
+
+class MetadataItem(BaseModel):
+    filename: str
+    title: str | None = ""
+    caption: str | None = ""
+    tags: list[str] | None = []
+    mask: str | None = ""
+
+
+@api_view(["GET"])
+def dataset_export(request, dataset_id: int):
+    dataset = Dataset.objects.filter(id=dataset_id).first()
+    if not dataset:
+        raise Http404("Dataset not found")
+
+    items = DatasetItem.objects.filter(dataset_id=dataset_id).order_by("image_path")
+    results: list[dict] = []
+    for item in items:
+        title = ""
+        caption = ""
+        tags: list[str] = []
+        if item.caption_path:
+            abs_caption = os.path.join(dataset.root_dir, item.caption_path)
+            if os.path.isfile(abs_caption):
+                try:
+                    with open(abs_caption, "r", encoding="utf-8") as f:
+                        data = f.read().strip()
+                    try:
+                        obj = json.loads(data)
+                        title = obj.get("title", "") or ""
+                        caption = obj.get("caption", "") or ""
+                        tags = obj.get("tags", []) or []
+                    except json.JSONDecodeError:
+                        caption = data
+                except OSError:
+                    pass
+        results.append(
+            {
+                "filename": item.image_path,
+                "title": title,
+                "caption": caption,
+                "tags": tags,
+                "mask": item.mask_path or "",
+            }
+        )
+
+    return Response(results)
+
+
+@api_view(["POST"])
+def dataset_import(request, dataset_id: int):
+    dataset = Dataset.objects.filter(id=dataset_id).first()
+    if not dataset:
+        raise Http404("Dataset not found")
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return Response({"detail": "invalid json"}, status=400)
+
+    if not isinstance(payload, list):
+        return Response({"detail": "invalid format"}, status=400)
+
+    items: list[MetadataItem] = []
+    filenames: set[str] = set()
+    for raw in payload:
+        try:
+            meta = MetadataItem(**raw)
+        except ValidationError as e:  # pragma: no cover - validation is trivial
+            return Response({"detail": e.errors()}, status=400)
+        if meta.filename in filenames:
+            return Response({"detail": f"duplicate filename: {meta.filename}"}, status=400)
+        filenames.add(meta.filename)
+        items.append(meta)
+
+    qs = DatasetItem.objects.filter(dataset_id=dataset_id)
+    db_map = {obj.image_path: obj for obj in qs}
+    db_names = set(db_map.keys())
+
+    if filenames != db_names:
+        missing = sorted(db_names - filenames)
+        extra = sorted(filenames - db_names)
+        return Response(
+            {"detail": "filenames mismatch", "missing": missing, "extra": extra},
+            status=400,
+        )
+
+    for meta in items:
+        item = db_map[meta.filename]
+        # determine caption path
+        caption_rel = item.caption_path
+        if not caption_rel:
+            base, _ = os.path.splitext(meta.filename)
+            caption_rel = base + ".json"
+            item.caption_path = caption_rel
+
+        abs_caption = os.path.join(dataset.root_dir, caption_rel)
+        os.makedirs(os.path.dirname(abs_caption), exist_ok=True)
+        with open(abs_caption, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "title": meta.title or "",
+                    "caption": meta.caption or "",
+                    "tags": meta.tags or [],
+                },
+                f,
+                ensure_ascii=False,
+            )
+
+        item.has_caption = bool(meta.caption)
+        item.mask_path = meta.mask or ""
+        item.save(update_fields=["caption_path", "mask_path", "has_caption"])
+
+    return Response({"updated": len(items)})
 
 # === Scan ===
 
@@ -310,6 +429,8 @@ class DatasetScanSerializer(serializers.Serializer):
 
 @api_view(["POST"])
 def dataset_scan(request):
+    ser = DatasetScanSerializer(data=request.data)
+    ser.is_valid(raise_exception=True)
     name = ser.validated_data["name"]
     root_dir = ser.validated_data["root_dir"]
 
@@ -353,10 +474,7 @@ def dataset_scan(request):
             obj.has_caption = has_caption
             obj.save(update_fields=["has_caption"])
 
-
-def dataset_view_page(request, dataset_id: int):
-    """Render the dataset browser page."""
-    return render(request, "dataset_viewer/detail.html", {"dataset_id": dataset_id})
+    return Response({"created": created, "skipped": skipped})
 
 def dataset_view_page(request, dataset_id: int):
     """Render the dataset browser page."""
