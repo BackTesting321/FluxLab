@@ -1,32 +1,53 @@
-import uuid
+from __future__ import annotations
+
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .serializers import PreviewRequestSerializer
+from .serializers import EnhancePreviewRequestSerializer
+from .utils import (
+    AutoPolicy,
+    build_auto_policy_pipeline,
+    estimate_quality,
+    simulate_step,
+    validate_pipeline,
+)
 
 
 @api_view(["POST"])
 def preview(request):
-    serializer = PreviewRequestSerializer(data=request.data)
+    serializer = EnhancePreviewRequestSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 
-    ops = data.get("ops") or []
-    if data.get("auto_policy"):
-        ops = [
-            {"type": "denoise", "level": "light"},
-            {"type": "upscale", "scale": 2},
-        ]
+    pipeline = data.get("pipeline")
+    policy = data.get("auto_policy")
+    image_path = data.get("image_path") or ""
 
-    input_size = [1024, 1024]
-    output_size = [2048, 2048] if any(op.get("type") == "upscale" for op in ops) else input_size
-    preview_path = f"storage/runs/previews/{uuid.uuid4()}.jpg"
+    quality_before = estimate_quality(image_path)
 
-    preview_data = {
-        "input": {"image_path": data["image_path"], "size": input_size},
-        "ops": ops,
-        "time": 1.23,
-        "output": {"image_path": preview_path, "size": output_size},
+    if not pipeline:
+        pipeline = build_auto_policy_pipeline(AutoPolicy(policy), quality_before)
+        validate_pipeline(pipeline)
+
+    applied = []
+    logs = []
+    est_total = 0
+    quality_after = quality_before
+
+    for step_cfg in pipeline:
+        sim = simulate_step(step_cfg)
+        applied.append({"type": sim.name, "params": sim.params})
+        est_total += sim.est_time_ms
+        quality_after += sim.delta_quality
+        logs.append(f"Applied {sim.name} with {sim.params}")
+
+    result = {
+        "ok": True,
+        "applied_pipeline": applied,
+        "estimated_time_ms": est_total,
+        "quality_before": round(quality_before, 3),
+        "quality_after": round(quality_after, 3),
+        "logs": logs,
     }
 
-    return Response({"ok": True, "preview": preview_data})
+    return Response(result)
