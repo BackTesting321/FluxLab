@@ -12,5 +12,6 @@ path('api/datasets/', include('dataset_viewer.urls')),
 path('datasets/', include('dataset_viewer.urls')),
 path('api/dataset-items/<int:item_id>/mask', ds_views.dataset_item_mask),
 path('api/dataset-items/<int:item_id>/mask/preview', ds_views.dataset_item_mask_preview),
+path('api/enhance/', include('enhance.urls')),
 path('', include('webui.urls')),
 ]
